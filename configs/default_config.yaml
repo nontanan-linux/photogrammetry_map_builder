@@ -1,0 +1,15 @@
+# Default configuration for photogrammetry_map_builder
+project_name: bua_survey
+image_dir: ../resource/Module-Test-Data/Rawdata/DJI_202609300833_038_bua
+gcp_file: ../resource/Module-Test-Data/GCP/gcp_Bua_final.txt
+mrk_file: ../resource/Module-Test-Data/Rawdata/DJI_202609300833_038_bua/DJI_20260930083707_0002_D.MRK
+output_dir: ./outputs/bua_survey
+
+# Auto-detect UTM EPSG if null
+target_epsg: null
+
+# Processing & Resolution
+proc_scale: 0.25        # 0.25 = 1320x989 processing scale for fast SfM + ortho
+ortho_gsd_m: 0.05       # 5 cm/px orthomosaic
+dsm_resolution_m: 0.25  # 25 cm/px DSM/DTM
+max_images: null        # Set integer (e.g. 15) for quick test runs

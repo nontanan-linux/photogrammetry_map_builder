@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "photogrammetry-map-builder"
+version = "0.1.0"
+description = "Drone photogrammetry and GIS map builder for orthomosaics, DSMs, 3D point clouds, and spatial vector products."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "opencv-python>=4.8",
+    "pillow>=10.0",
+    "pyproj>=3.5",
+    "open3d>=0.17",
+    "pyyaml>=6.0",
+    "tqdm>=4.65",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+pmb = "photogrammetry_map_builder.cli:main"
+photogrammetry-map-builder = "photogrammetry_map_builder.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["photogrammetry_map_builder*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
