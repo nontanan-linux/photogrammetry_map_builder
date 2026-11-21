@@ -14,9 +14,13 @@ from photogrammetry_map_builder.io import (
     write_geotiff,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SAMPLE_RAW = REPO_ROOT / "resource" / "Module-Test-Data" / "Rawdata" / "DJI_202609300833_038_bua"
-SAMPLE_GCP = REPO_ROOT / "resource" / "Module-Test-Data" / "GCP"
+PKG_ROOT = Path(__file__).resolve().parents[1]
+RESOURCES_DIR = PKG_ROOT / "resources" / "Module-Test-Data"
+if not RESOURCES_DIR.exists():
+    RESOURCES_DIR = PKG_ROOT.parent / "resource" / "Module-Test-Data"
+
+SAMPLE_RAW = RESOURCES_DIR / "Rawdata" / "DJI_202609300833_038_bua"
+SAMPLE_GCP = RESOURCES_DIR / "GCP"
 
 
 def test_utm_epsg_from_lon_lat():

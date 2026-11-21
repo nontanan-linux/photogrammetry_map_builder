@@ -1,71 +1,129 @@
-# photogrammetry_map_builder
+# Photogrammetry Map Builder (`photogrammetry_map_builder`)
 
-Python package สำหรับสร้างแผนที่ **Orthophoto**, **Digital Surface Model (DSM)**, **Digital Terrain Model (DTM)**, **Plant Health (VARI)**, **3D Point Cloud**, **3D Mesh Model**, และ **GIS Vectors (GeoJSON)** จากภาพถ่ายโดรนและข้อมูล RTK/GCP ตามแนวทาง **Module 3: Photogrammetry & 3D Model Generation**
+A modular Python package for constructing georeferenced **2D Orthomosaics**, **Digital Surface Models (DSM)**, **Digital Terrain Models (DTM)**, **Plant Health Indices (VARI)**, **3D Point Clouds**, **3D Triangle Meshes**, and **GIS Vector Layers (GeoJSON)** from UAV / drone imagery and RTK / GCP survey data.
+
+Designed and implemented in alignment with **Module 3: Photogrammetry & 3D Model Generation** from the EEC Smart City GeoAI Training Curriculum (supported by the Thailand Board of Investment - BOI).
 
 ---
 
-## 📦 การติดตั้ง (Installation)
+## 🌟 Key Features
 
-แนะนำให้ติดตั้งในโหมด Editable เพื่อให้สามารถเรียกใช้คำสั่ง **`pmb`** ได้จากทุกที่ใน Terminal:
+- **Robust Metadata & RTK Ingestion**:
+  - Parses DJI EXIF and XMP metadata, including RTK positioning status (`RtkFlag=50`), gimbal orientations (Yaw, Pitch, Roll), calibrated focal lengths, and `DewarpData` Brown-Conrady camera distortion parameters.
+  - Supports DJI `.MRK` event marker logs with exposure timestamps and millimeter-level antenna offset corrections.
+  - Automatically projects coordinates from WGS 84 (`EPSG:4326`) to the optimal local UTM zone (`EPSG:326xx` / `EPSG:327xx`) using `pyproj`.
+- **Flexible Ground Control Point (GCP) Handling**:
+  - Parses both plain coordinate lists (`EPSG:4326`) and WebODM / Pix4D multi-column format with 2D image pixel observations.
+  - Computes 2D image reprojection errors and 3D ground position RMSE residuals.
+- **Structure-from-Motion (SfM) & Georeferenced Bundle Adjustment**:
+  - SIFT feature extraction with spatial nearest-neighbor image pair selection based on UTM proximity.
+  - Robust Fundamental matrix estimation with RANSAC outlier filtering.
+  - Multi-view track creation via Union-Find and linear Direct Linear Transform (DLT) triangulation.
+  - Joint non-linear least-squares optimization (`scipy.optimize.least_squares`) incorporating RTK priors, gimbal IMU priors, and GCP ground constraints.
+- **Elevation Models (DSM & DTM)**:
+  - Generates Digital Surface Models (DSM) including all structures and vegetation.
+  - Derives Digital Terrain Models (DTM) representing bare-earth elevation using morphological ground filtering.
+  - Outputs standard 32-bit float GeoTIFFs with `GDAL_NODATA` tags and colormapped preview images.
+- **Terrain-Aware Orthorectification**:
+  - Back-projects pixels through the camera model onto the interpolated DSM.
+  - Employs smooth nadir / center-weighted feather blending to eliminate seamlines across adjacent flight lines.
+- **Plant Health Analysis**:
+  - Computes the Visible Atmospherically Resistant Index (VARI) from RGB bands:
+    $$\text{VARI} = \frac{G - R}{G + R - B}$$
+  - Renders red-yellow-green vegetation previews highlighting healthy canopy vs. bare ground / built-up areas.
+- **3D Export**:
+  - Generates colored 3D Point Clouds (`.ply`) via `Open3D`.
+  - Generates textured 3D triangle meshes (`.obj`) with normal vectors.
+- **GIS Vectors & Interactive Dashboard**:
+  - Exports flight trajectories, camera stations, image footprints, GCPs, and bounding boxes to standard WGS 84 GeoJSON.
+  - Generates a standalone `index.html` interactive dashboard viewer for instant browser inspection.
+
+---
+
+## 📁 Package Structure
+
+```text
+photogrammetry_map_builder/
+├── configs/                       # Ready-to-use pipeline configuration files
+│   └── default_config.yaml        # Default YAML settings pointing to resources/
+├── examples/                      # Example workflows and Python scripts
+│   └── run_bua_sample.py          # Python API demo script
+├── outputs/                       # Default output directory (subdirectories 01 to 06)
+├── resources/                     # Package resource directory (datasets & GCPs)
+│   └── Module-Test-Data/
+│       ├── Rawdata/               # Aerial imagery (.JPG) and RTK logs (.MRK)
+│       └── GCP/                   # Ground Control Point files (.txt)
+├── photogrammetry_map_builder/    # Core Python library
+│   ├── __init__.py                # Public API exports
+│   ├── __main__.py                # Entrypoint for `python3 -m photogrammetry_map_builder`
+│   ├── cli.py                     # Command-line interface (`inspect`, `build`, `view`)
+│   ├── models.py                  # Dataclasses and internal schemas
+│   ├── pipeline.py                # Pipeline orchestrator (`MapBuilder`, `PipelineConfig`)
+│   ├── io/                        # File I/O: EXIF, XMP, MRK, GCP, GeoTIFF, GeoJSON, HTML Dashboard
+│   ├── geometry/                  # Camera models, SfM, Point Cloud, DSM/DTM, 3D Mesh
+│   └── mapping/                   # Orthorectification, Feather Blending, Plant Health (VARI)
+├── pyproject.toml                 # Package definition & dependencies (PEP 517/621)
+├── README.md                      # English documentation
+└── tests/                         # Automated unit & integration tests (pytest)
+```
+
+---
+
+## 💾 Dataset Download
+
+To download the sample UAV flight dataset (DJI Matrice 4E imagery with RTK `.MRK` and GCP survey data):
+
+- **Google Drive**: [Download Module-Test-Data Dataset](https://drive.google.com/drive/folders/1N7p9Vm6r3uBts-uarrThG0iciAd8AKI_?usp=sharing)
+- Extract the downloaded files into `resources/Module-Test-Data/`:
+  ```text
+  resources/Module-Test-Data/
+  ├── Rawdata/
+  │   └── DJI_202609300833_038_bua/   # 99 aerial images (.JPG) + RTK log (.MRK)
+  └── GCP/
+      ├── EPSG4326_Bua.txt            # GCPs in WGS 84 geographic coordinates
+      └── gcp_Bua_final.txt           # GCP coordinates & image pixel marks (WebODM format)
+  ```
+
+---
+
+## 📦 Installation
+
+Install the package in editable mode so that the `pmb` CLI command and Python modules are accessible globally:
 
 ```bash
 cd /home/tacv/workspace/DDMdrone/photogrammetry_map_builder
 pip install -e .
 ```
 
-*เมื่อติดตั้งแล้ว คำสั่ง `pmb` และ `python3 -m photogrammetry_map_builder` จะสามารถเรียกใช้งานได้ทันที*
-
----
-
-## 📁 โครงสร้างแพ็กเกจ (Package Layout)
-
-```text
-photogrammetry_map_builder/
-├── configs/
-│   └── default_config.yaml        # ค่าคอนฟิกเริ่มต้นสำหรับการรันด้วย --config
-├── examples/
-│   └── run_bua_sample.py          # สคริปต์ตัวอย่างเรียกใช้ผ่าน Python API
-├── outputs/                       # โฟลเดอร์เก็บผลลัพธ์ (แยกตาม project_name)
-├── photogrammetry_map_builder/    # ซอร์สโค้ดหลักของแพ็กเกจ
-│   ├── __init__.py                # Export คลาสและฟังก์ชันหลัก
-│   ├── __main__.py                # Entrypoint สำหรับ python3 -m photogrammetry_map_builder
-│   ├── cli.py                     # คำสั่ง CLI (inspect, build, view)
-│   ├── models.py                  # Data models และโครงสร้างข้อมูล
-│   ├── pipeline.py                # Pipeline orchestrator (MapBuilder)
-│   ├── io/                        # จัดการไฟล์ EXIF/XMP, MRK, GCP, GeoTIFF, Dashboard
-│   ├── geometry/                  # Camera Model, SfM, Point Cloud, DSM/DTM, 3D Mesh
-│   └── mapping/                   # Orthorectification, Feather Blending, Plant Health (VARI)
-├── pyproject.toml                 # กำหนดค่า Metadata และ Dependencies (PEP 517/621)
-├── README.md                      # เอกสารคู่มือการใช้งาน
-└── tests/                         # ชุดทดสอบอัตโนมัติ (pytest)
-```
-
----
-
-## 💾 ดาวน์โหลดชุดข้อมูลตัวอย่าง (Dataset Download)
-
-ดาวน์โหลดชุดข้อมูลตัวอย่างสำหรับการทดสอบระบบ (ภาพถ่ายโดรน DJI Matrice 4E 99 ภาพ, ไฟล์ RTK `.MRK`, และพิกัด GCP) ได้ที่:
-- **Google Drive**: [Download Module-Test-Data Dataset](https://drive.google.com/drive/folders/1N7p9Vm6r3uBts-uarrThG0iciAd8AKI_?usp=sharing)
-- นำไฟล์ที่ดาวน์โหลดมาเก็บไว้ที่ `../resource/Module-Test-Data/`
-
----
-
-## 🛠️ การใช้งานผ่าน Command Line (CLI Guide)
-
-แพ็กเกจมี 3 คำสั่งหลัก: **`inspect`**, **`build`**, และ **`view`**
-
-### 1. ตรวจสอบข้อมูลนำเข้า (`inspect`)
-ตรวจสอบความถูกต้องของภาพถ่าย ตำแหน่งพิกัด สถานะ RTK และข้อมูล GCP ก่อนเริ่มประมวลผล:
+Verify the installation:
 
 ```bash
-pmb inspect \
-  --input ../resource/Module-Test-Data/Rawdata/DJI_202609300833_038_bua \
-  --gcp ../resource/Module-Test-Data/GCP/gcp_Bua_final.txt
+pmb --help
 ```
 
-**ตัวอย่างผลลัพธ์:**
+---
+
+## 🛠️ Command-Line Interface (CLI)
+
+The CLI provides three primary subcommands: **`inspect`**, **`build`**, and **`view`**.
+
+### 1. `pmb inspect` — Inspect Dataset Metadata
+Validates image files, coordinates, RTK fix ratio, and Ground Control Points before running processing.
+
+```bash
+# Automatically detects sample data in resources/Module-Test-Data/
+pmb inspect
+
+# Or specify custom paths:
+pmb inspect \
+  --input resources/Module-Test-Data/Rawdata/DJI_202609300833_038_bua \
+  --gcp resources/Module-Test-Data/GCP/gcp_Bua_final.txt
+```
+
+**Example Output:**
 ```text
 Images: 99 (DJI Matrice 4E)
+Source: resources/Module-Test-Data/Rawdata/DJI_202609300833_038_bua
 Auto UTM EPSG: 32647
 Lat range: 13.2313755 .. 13.2332348
 Lon range: 100.9543679 .. 100.9561978
@@ -76,132 +134,150 @@ GCPs: 5 (15 image observations), CRS: +proj=utm +zone=47 +ellps=WGS84 +datum=WGS
 
 ---
 
-### 2. ประมวลผลสร้างแผนที่ (`build`)
+### 2. `pmb build` — Run Mapping Pipeline
+Executes the full photogrammetry pipeline: SfM bundle adjustment, DSM/DTM interpolation, orthomosaicking, vegetation index calculation, 3D model generation, and GIS vector export.
 
-#### แบบที่ 1: ใช้ไฟล์คอนฟิก YAML (แนะนำ)
+#### Option A: Using the default YAML configuration (Recommended)
 ```bash
 pmb build --config configs/default_config.yaml
 ```
 
-#### แบบที่ 2: ระบุพารามิเตอร์ผ่านคำสั่ง CLI โดยตรง
+#### Option B: Direct CLI arguments (Fast 12-image test run)
 ```bash
 pmb build \
-  --input ../resource/Module-Test-Data/Rawdata/DJI_202609300833_038_bua \
-  --gcp ../resource/Module-Test-Data/GCP/gcp_Bua_final.txt \
-  --mrk ../resource/Module-Test-Data/Rawdata/DJI_202609300833_038_bua/DJI_20260930083707_0002_D.MRK \
-  --output ./outputs/bua_survey \
-  --name bua_survey \
+  --input resources/Module-Test-Data/Rawdata/DJI_202609300833_038_bua \
+  --gcp resources/Module-Test-Data/GCP/gcp_Bua_final.txt \
+  --mrk resources/Module-Test-Data/Rawdata/DJI_202609300833_038_bua/DJI_20260930083707_0002_D.MRK \
+  --output ./outputs/bua_quick \
+  --name bua_quick \
+  --max-images 12 \
   --gsd 0.05 \
   --dsm-res 0.25
 ```
 
-#### รายละเอียดพารามิเตอร์ของคำสั่ง `build`:
-| ตัวเลือก | ตัวย่อ | ค่าเริ่มต้น | คำอธิบาย |
+#### CLI Build Arguments:
+| Argument | Short | Default | Description |
 |---|---|---|---|
-| `--input` | `-i` | (จำเป็น) | ไดเรกทอรีที่เก็บไฟล์ภาพถ่ายโดรน (.JPG, .TIF) |
-| `--output` | `-o` | (จำเป็น) | ไดเรกทอรีสำหรับบันทึกผลลัพธ์ |
-| `--config` | `-c` | `None` | ไฟล์ตั้งค่า YAML (แทนการใส่ flag ทั้งหมด) |
-| `--gcp` | | `None` | ไฟล์พิกัด GCP (รองรับทั้ง EPSG:4326 และรูปแบบ WebODM) |
-| `--mrk` | | `None` | ไฟล์บันทึกตำแหน่งเวลาเปิดชัตเตอร์ DJI `.MRK` |
-| `--epsg` | | Auto UTM | ระบบพิกัดเป้าหมาย (หากไม่ระบุจะเลือก UTM Zone ให้อัตโนมัติ) |
-| `--gsd` | | `0.05` | Ground Sample Distance ของ Orthophoto (เมตร/พิกเซล) |
-| `--dsm-res` | | `0.25` | ความละเอียดของโมเดลความสูง DSM/DTM (เมตร/พิกเซล) |
-| `--scale` | | `0.25` | สัดส่วนย่อภาพขณะประมวลผล SfM เพื่อความรวดเร็ว |
-| `--max-images`| | `None` | จำกัดจำนวนภาพ (สำหรับทดสอบประมวลผลด่วน เช่น 10-15 ภาพ) |
-| `--name` | | `drone_map` | ชื่อ Prefix ของไฟล์ผลลัพธ์ |
-| `--quiet` | | `False` | ปิดแถบ Progress Bar |
+| `--input` | `-i` | `None` | Path to directory containing drone images |
+| `--output` | `-o` | `None` | Path to output directory |
+| `--config` | `-c` | `None` | Path to YAML configuration file |
+| `--gcp` | | `None` | Path to GCP coordinate file |
+| `--mrk` | | `None` | Path to DJI `.MRK` exposure marker file |
+| `--epsg` | | Auto UTM | Target projected EPSG code (e.g. `32647`) |
+| `--gsd` | | `0.05` | Orthomosaic Ground Sample Distance (meters/pixel) |
+| `--dsm-res` | | `0.25` | DSM / DTM grid resolution (meters/pixel) |
+| `--scale` | | `0.25` | Downsampling factor for feature extraction (0.25 = fast & robust) |
+| `--max-images` | | `None` | Limit number of processed images (useful for quick testing) |
+| `--name` | | `drone_map` | File prefix for output products |
+| `--quiet` | | `False` | Suppress interactive progress bars |
 
 ---
 
-### 3. ตรวจสอบและดูผลลัพธ์ (`view`)
-
-เปิดดูผลลัพธ์ผ่านเว็บเบราว์เซอร์ด้วย Local Web Dashboard ทันที:
+### 3. `pmb view` — Inspect Results in Web Browser
+Launches a local HTTP server and presents all map layers, elevation models, plant health indices, flight trajectories, GCP residuals, and file paths in an interactive dashboard.
 
 ```bash
-pmb view --output ./outputs/bua_survey
+pmb view --output ./outputs/bua_quick
 ```
 
-- ระบบจะเปิด Web Server ให้ที่ **`http://localhost:8765/index.html`**
-- สามารถเปลี่ยนพอร์ตได้ด้วย `--port <เลขพอร์ต>` เช่น `--port 8080`
-- หากต้องการแค่แสดงรายการไฟล์ในเทอร์มินัลโดยไม่เปิดเว็บเซิร์ฟเวอร์ ให้ใส่ `--no-serve`
+Open **`http://localhost:8765/index.html`** in any web browser.
+
+- To change the server port: `pmb view --output ./outputs/bua_quick --port 8080`
+- To inspect folder contents in the terminal without running a server: `pmb view --output ./outputs/bua_quick --no-serve`
 
 ---
 
-## 🗂️ โครงสร้างการจัดเก็บผลลัพธ์ (Output Directory Structure)
+## 🗂️ Output Directory Layout
 
-ผลลัพธ์ทั้งหมดถูกจัดเก็บเป็นหมวดหมู่ตามมาตรฐาน [Module 3](file:///home/tacv/workspace/DDMdrone/docs/module_03/Module%203%20Photogrammetry%20_%203D%20Model%20Generation.pdf):
+Output products are organized into numbered subdirectories according to the Module 3 deliverables:
 
 ```text
 outputs/<project_name>/
-├── index.html                     # หน้า Interactive Dashboard รวมผลลัพธ์ทั้งหมด
+├── index.html                     # Standalone HTML dashboard viewer
 │
-├── 01_orthophoto/                 # แผนที่ภาพถ่ายมุมมองด้านบน (Orthophoto)
-│   ├── <name>_ortho.tif           # ภาพ Orthomosaic GeoTIFF พร้อมพิกัด
-│   ├── <name>_ortho.tfw           # World file สำหรับโปรแกรม GIS
-│   ├── <name>_ortho.prj           # ข้อมูลระบบพิกัด WKT
-│   └── <name>_ortho_preview.png   # ภาพตัวอย่างความละเอียดสูง
+├── 01_orthophoto/                 # High-resolution 2D Orthophoto
+│   ├── <name>_ortho.tif           # Georeferenced Orthomosaic (RGBA GeoTIFF)
+│   ├── <name>_ortho.tfw           # ESRI World File for GIS software
+│   ├── <name>_ortho.prj           # WKT projection file
+│   └── <name>_ortho_preview.png   # High-resolution PNG preview
 │
-├── 02_elevation/                  # โมเดลความสูงพื้นผิว (DSM) และภูมิประเทศ (DTM)
-│   ├── <name>_dsm.tif             # Digital Surface Model (รวมสิ่งปลูกสร้าง/ต้นไม้)
-│   ├── <name>_dsm_preview.png     # ภาพแสดงระดับความสูง DSM แบบ Color Ramp
-│   ├── <name>_dtm.tif             # Digital Terrain Model (กรองพื้นผิวดินจริง)
-│   └── <name>_dtm_preview.png     # ภาพแสดงระดับความสูง DTM
+├── 02_elevation/                  # Digital Elevation Models
+│   ├── <name>_dsm.tif             # Digital Surface Model (DSM, includes structures/canopy)
+│   ├── <name>_dsm_preview.png     # Colormapped DSM elevation preview
+│   ├── <name>_dtm.tif             # Digital Terrain Model (DTM, bare-earth filtered)
+│   └── <name>_dtm_preview.png     # Colormapped DTM elevation preview
 │
-├── 03_plant_health/               # วิเคราะห์ดัชนีสุขภาพพืช (Plant Health)
-│   ├── <name>_plant_health_vari.tif  # Visible Atmospherically Resistant Index (VARI) GeoTIFF
-│   └── <name>_plant_health_preview.png# ภาพจำแนกพื้นที่พืชพรรณ (เขียว=สมบูรณ์, แดง=สิ่งปลูกสร้าง/ดิน)
+├── 03_plant_health/               # Vegetation Analysis
+│   ├── <name>_plant_health_vari.tif  # Visible Atmospherically Resistant Index (VARI GeoTIFF)
+│   └── <name>_plant_health_preview.png# Green-Yellow-Red plant health preview
 │
-├── 04_3d_model/                   # โมเดลและกลุ่มจุด 3 มิติ
-│   ├── <name>_pointcloud.ply      # 3D Point Cloud มีค่าสี RGB (เปิดด้วย CloudCompare)
-│   └── <name>_3d_model.obj        # 3D Textured Triangle Mesh (เปิดด้วย MeshLab / Blender)
+├── 04_3d_model/                   # 3D Point Clouds and Meshes
+│   ├── <name>_pointcloud.ply      # Dense RGB Point Cloud (.ply, viewable in CloudCompare)
+│   └── <name>_3d_model.obj        # 3D Triangle Mesh (.obj, viewable in MeshLab / Blender)
 │
-├── 05_gis_vectors/                # ชั้นข้อมูลเวกเตอร์ GIS
-│   └── <name>_flight.geojson      # แนวบิน, ตำแหน่งกล้อง, Footprints, ขอบเขตแปลง และจุด GCP
+├── 05_gis_vectors/                # Spatial Vector Layers
+│   └── <name>_flight.geojson      # Flight path, camera stations, footprints, GCPs (WGS 84)
 │
-└── 06_reports/                    # รายงานผลการประมวลผลและการประเมินความถูกต้อง (QA)
-    ├── <name>_report.json         # สถิติและค่าความคลาดเคลื่อนรูปแบบ JSON
-    └── <name>_report.md           # รายงานสรุปรูปแบบ Markdown พร้อมตาราง GCP Residuals
+└── 06_reports/                    # Quality Assurance & Calibration
+    ├── <name>_report.json         # Processing statistics and bundle adjustment metrics
+    └── <name>_report.md           # Human-readable Markdown report with GCP residual table
 ```
 
 ---
 
-## 💻 การเรียกใช้งานผ่าน Python API
+## 💻 Python API Usage
+
+The pipeline can be directly integrated into other Python applications:
 
 ```python
 from pathlib import Path
 from photogrammetry_map_builder import PipelineConfig, MapBuilder, build_map
 
-# วิธีที่ 1: เรียกใช้ผ่านฟังก์ชันลัด build_map
+# Quick one-liner execution:
 products = build_map(
-    image_dir="../resource/Module-Test-Data/Rawdata/DJI_202609300833_038_bua",
-    output_dir="./outputs/my_drone_survey",
-    gcp_file="../resource/Module-Test-Data/GCP/gcp_Bua_final.txt",
-    mrk_file="../resource/Module-Test-Data/Rawdata/DJI_202609300833_038_bua/DJI_20260930083707_0002_D.MRK",
-    project_name="bua_pipeline",
+    image_dir="resources/Module-Test-Data/Rawdata/DJI_202609300833_038_bua",
+    output_dir="outputs/bua_survey",
+    gcp_file="resources/Module-Test-Data/GCP/gcp_Bua_final.txt",
+    mrk_file="resources/Module-Test-Data/Rawdata/DJI_202609300833_038_bua/DJI_20260930083707_0002_D.MRK",
+    project_name="bua_survey",
     ortho_gsd_m=0.05,
     dsm_resolution_m=0.25,
     proc_scale=0.25,
 )
 
-print("Orthophoto Path :", products.orthomosaic_tif)
-print("DSM Path        :", products.dsm_tif)
-print("DTM Path        :", products.dtm_tif)
-print("Dashboard HTML  :", products.dashboard_html)
+print(f"Orthophoto GeoTIFF : {products.orthomosaic_tif}")
+print(f"DSM GeoTIFF        : {products.dsm_tif}")
+print(f"DTM GeoTIFF        : {products.dtm_tif}")
+print(f"Plant Health VARI  : {products.plant_health_tif}")
+print(f"Point Cloud PLY    : {products.point_cloud_ply}")
+print(f"Dashboard Viewer   : {products.dashboard_html}")
 ```
 
 ---
 
-## 🔧 การแก้ไขปัญหาที่พบบ่อย (Troubleshooting)
+## 🖥️ Recommended Software for Viewing Results
 
-### ปัญหา: `ModuleNotFoundError: No module named 'photogrammetry_map_builder'`
-- **สาเหตุ**: เรียกคำสั่งขณะที่อยู่ในไดเรกทอรีย่อยซ้ำกันสองชั้น เช่น `.../photogrammetry_map_builder/photogrammetry_map_builder` หรือยังไม่ได้ติดตั้ง package
-- **วิธีแก้**:
-  1. ถอยออกมาที่โฟลเดอร์หลักของแพ็กเกจ:
-     ```bash
-     cd /home/tacv/workspace/DDMdrone/photogrammetry_map_builder
-     ```
-  2. รันติดตั้งในโหมด editable:
-     ```bash
-     pip install -e .
-     ```
-  3. หลังจากนี้สามารถเรียกใช้งานผ่านคำสั่ง `pmb` ได้ทันทีจากทุกโฟลเดอร์
+- **Web Browser** (Chrome / Firefox / Edge): Open `index.html` directly for an all-in-one interactive overview.
+- **GIS Desktop** ([QGIS](https://qgis.org/) / ArcGIS Pro): Drag-and-drop `.tif` files from `01_orthophoto/`, `02_elevation/`, `03_plant_health/`, and `.geojson` from `05_gis_vectors/`.
+- **3D Point Clouds & Meshes**:
+  - [CloudCompare](https://www.cloudcompare.org/): For opening and measuring `04_3d_model/<name>_pointcloud.ply`.
+  - [MeshLab](https://www.meshlab.net/) / [Blender](https://www.blender.org/): For inspecting and rendering `04_3d_model/<name>_3d_model.obj`.
+
+---
+
+## 🧪 Automated Testing
+
+Execute the test suite to verify all I/O modules, camera geometry, and pipeline functions:
+
+```bash
+pytest -v
+```
+
+All 7 test suites validate:
+1. Pinhole camera ray-ground projection and round-trip consistency.
+2. End-to-end pipeline execution and output verification.
+3. Automatic longitude/latitude to UTM zone EPSG calculation.
+4. DJI Matrice 4E EXIF/XMP parsing and lens distortion parameter extraction.
+5. DJI `.MRK` RTK log reading.
+6. GCP coordinate parsing and CRS transformation.
+7. Pure-Python GeoTIFF, World File (`.tfw`), and projection (`.prj`) generation.

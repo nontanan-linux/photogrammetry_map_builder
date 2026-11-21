@@ -12,9 +12,13 @@ from photogrammetry_map_builder.geometry.camera import (
 )
 from photogrammetry_map_builder.io import load_image_metadata
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SAMPLE_RAW = REPO_ROOT / "resource" / "Module-Test-Data" / "Rawdata" / "DJI_202609300833_038_bua"
-SAMPLE_GCP = REPO_ROOT / "resource" / "Module-Test-Data" / "GCP" / "gcp_Bua_final.txt"
+PKG_ROOT = Path(__file__).resolve().parents[1]
+RESOURCES_DIR = PKG_ROOT / "resources" / "Module-Test-Data"
+if not RESOURCES_DIR.exists():
+    RESOURCES_DIR = PKG_ROOT.parent / "resource" / "Module-Test-Data"
+
+SAMPLE_RAW = RESOURCES_DIR / "Rawdata" / "DJI_202609300833_038_bua"
+SAMPLE_GCP = RESOURCES_DIR / "GCP" / "gcp_Bua_final.txt"
 SAMPLE_MRK = SAMPLE_RAW / "DJI_20260930083707_0002_D.MRK"
 
 

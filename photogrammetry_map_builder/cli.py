@@ -41,8 +41,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "inspect",
         help="Inspect drone dataset EXIF/XMP metadata and optional GCP file.",
     )
-    p_inspect.add_argument("--input", "-i", required=True, help="Directory with drone images.")
-    p_inspect.add_argument("--gcp", default=None, help="Optional GCP file path.")
+    p_inspect.add_argument("--input", "-i", default=None, help="Directory with drone images (defaults to resources/Module-Test-Data/Rawdata/DJI_202609300833_038_bua).")
+    p_inspect.add_argument("--gcp", default=None, help="Optional GCP file path (defaults to resources/Module-Test-Data/GCP/gcp_Bua_final.txt).")
 
     # view
     p_view = sub.add_parser(
@@ -61,19 +61,42 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "inspect":
-        metas = load_dataset_metadata(args.input)
+        input_dir = args.input
+        if not input_dir:
+            for cand in [
+                Path("resources/Module-Test-Data/Rawdata/DJI_202609300833_038_bua"),
+                Path("../resource/Module-Test-Data/Rawdata/DJI_202609300833_038_bua"),
+            ]:
+                if cand.exists():
+                    input_dir = str(cand)
+                    break
+        if not input_dir:
+            parser.error("--input is required when resources are not found at default location.")
+
+        gcp_path = args.gcp
+        if not gcp_path:
+            for cand in [
+                Path("resources/Module-Test-Data/GCP/gcp_Bua_final.txt"),
+                Path("../resource/Module-Test-Data/GCP/gcp_Bua_final.txt"),
+            ]:
+                if cand.exists():
+                    gcp_path = str(cand)
+                    break
+
+        metas = load_dataset_metadata(input_dir)
         lats = [m.lat for m in metas]
         lons = [m.lon for m in metas]
         alts = [m.abs_alt for m in metas]
         rtk_fixed = sum(1 for m in metas if m.rtk_flag == 50)
         print(f"Images: {len(metas)} ({metas[0].drone_model})")
+        print(f"Source: {input_dir}")
         print(f"Auto UTM EPSG: {metas[0].target_epsg}")
         print(f"Lat range: {min(lats):.7f} .. {max(lats):.7f}")
         print(f"Lon range: {min(lons):.7f} .. {max(lons):.7f}")
         print(f"Abs Alt range: {min(alts):.2f} .. {max(alts):.2f} m")
         print(f"RTK Fixed (flag=50): {rtk_fixed}/{len(metas)}")
-        if args.gcp:
-            gcps = load_gcp_file(args.gcp)
+        if gcp_path and Path(gcp_path).exists():
+            gcps = load_gcp_file(gcp_path)
             obs_cnt = sum(len(g.observations) for g in gcps)
             print(f"GCPs: {len(gcps)} ({obs_cnt} image observations), CRS: {gcps[0].crs if gcps else 'N/A'}")
         return 0

@@ -4,9 +4,12 @@ from pathlib import Path
 from photogrammetry_map_builder import build_map
 
 PKG_ROOT = Path(__file__).resolve().parents[1]
-REPO_ROOT = PKG_ROOT.parent
-RAW_DIR = REPO_ROOT / "resource" / "Module-Test-Data" / "Rawdata" / "DJI_202609300833_038_bua"
-GCP_FILE = REPO_ROOT / "resource" / "Module-Test-Data" / "GCP" / "gcp_Bua_final.txt"
+RESOURCES_DIR = PKG_ROOT / "resources" / "Module-Test-Data"
+if not RESOURCES_DIR.exists():
+    RESOURCES_DIR = PKG_ROOT.parent / "resource" / "Module-Test-Data"
+
+RAW_DIR = RESOURCES_DIR / "Rawdata" / "DJI_202609300833_038_bua"
+GCP_FILE = RESOURCES_DIR / "GCP" / "gcp_Bua_final.txt"
 MRK_FILE = RAW_DIR / "DJI_20260930083707_0002_D.MRK"
 
 
